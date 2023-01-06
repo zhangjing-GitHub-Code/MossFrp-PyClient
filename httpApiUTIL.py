@@ -2,6 +2,8 @@ import requests,json
 from custlang import *
 APIROOTURI="public.ghs.wiki:7001"
 from logging import basicConfig,getLogger
+import logging
+basicConfig(format="[%(asctime)s] [%(name)s] [%(levelname)s] -> %(message)s",level=logging.INFO)
 api_log=getLogger(name="API")
 #del(dict)
 """
@@ -37,16 +39,24 @@ sp_map={
 
 def reqAPI(rtype : str,cargs : dict[str,str]):
     global token
-    api_req_root="http://"+APIROOTURI+"/API"
-    newargs=cargs.copy()
+    api_req_uri="http://"+APIROOTURI+"/API?"
+    #newargs=cargs.copy()
+    newargs=cargs
     newargs["type"]=rtype
     if rtype!="login":
         newargs["token"]=token
-    req=requests.get(api_req_root,data=newargs)
+    for itm in newargs.keys():
+        api_req_uri+=itm
+        api_req_uri+="="+newargs[itm]
+        api_req_uri+="&"
+    api_req_uri=api_req_uri[:-1]
+    #api_log.info(api_req_uri)
+    req=requests.request("GET",api_req_uri,data=newargs,headers=newargs)
     #print(req.raw)
     if req.status_code!=200:
-        return -1,"HTTP Protocol Error"
-    retdat=json.loads(req.text)
+        return (-1,"HTTP Protocol Error: "+str(req.status_code))
+    retdat=json.loads(req.text) # type: ignore
+    #api_log.info(retdat)
     resstat=int(retdat["status"])
     if(resstat==200): return (1,retdat)
     if resstat in errmap.keys():
@@ -65,8 +75,21 @@ def m_login(loginType:str,acnt:str,passwd:str):
     if r[0]==1:
         global token
         token=r[1]["token"] #type:ignore # we love pylance
-        api_log.debug(str(r[0])+r[1])
+        api_log.debug(str(r[0])+str(r[1]))
         return True
+    else:
+        api_log.warning(str(r[0])+": "+r[1])
+        return False
+
+def m_logout(): # just simply reset token?
+    global token
+    token=""
+
+def userCodeList():
+    r=reqAPI("userCode",{})
+    if r[0]==1:
+        api_log.debug(str(r[0])+str(r[1]))
+        return True,list(r[1]["codeData"].values())
     else:
         api_log.warning(str(r[0])+": "+r[1])
         return False
