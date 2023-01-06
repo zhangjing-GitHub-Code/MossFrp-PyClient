@@ -1,6 +1,8 @@
+from threading import Thread
 import urllib.request as ureq
 import os,requests,sys,platform
 from custlang import *
+import subprocess,time
 from logging import basicConfig,getLogger
 import logging
 basicConfig(format="[%(asctime)s] [%(name)s] [%(levelname)s] -> %(message)s",level=logging.INFO)
@@ -16,6 +18,22 @@ fsuffix={
     "zip":".zip",
     "targz":".tar.gz"
 }
+#alivelist=[]
+aliveFrpc={}
+# server addr; server port; tunnel code; inst name; local ip; remote ip; remote port
+ini_template='''
+[common]
+server_addr = {}
+server_port = {}
+token = {}
+
+
+[{}]
+type = tcp
+local_ip = {}
+local_port = {}
+remote_port = {}
+'''
 #print(platform.architecture())
 '''
 Config & frpc dir:
@@ -69,3 +87,51 @@ def ensureFrpc(inst_name:str):
     return execF
 
 #frp_log.info(ensureFrpc("test"))
+class FrpcSubProc(Thread):
+    def __init__(self,instname:str,frpcF:str,iniF:str):
+        Thread.__init__(self)
+        self.frpc_exe=frpcF
+        self.instname=instname
+        self.conf_ini=iniF
+    def run(self):
+        global aliveFrpc
+        if self.instname in aliveFrpc.keys():
+            frp_log.error(langmap["duplicate_inst"].format(self.instname,aliveFrpc[self.instname])) #self.frpc_exe))
+            return
+        proc=subprocess.Popen([self.frpc_exe,'-c',self.conf_ini])
+        time.sleep(1)
+        if proc.poll()==None:
+            frp_log.info(langmap["frpc_start"].format(self.instname,self.frpc_exe))
+        else:
+            frp_log.warn(langmap["frpc_stop_fast"].format(self.instname,self.frpc_exe))
+            return
+        #global alivelist
+        #alivelist.append(proc.pid)
+        while True:
+            polstat=proc.poll()
+            if polstat!=None:
+                frp_log.info(langmap["frpc_exit"].format(self.instname,proc.pid,polstat))
+                del(aliveFrpc[self.instname])
+                return
+            if proc.pid not in aliveFrpc.values():
+                frp_log.info(langmap["frpc_mark_not_alive"].format(self.instname))
+                proc.terminate()
+                return
+
+def writeINIAndStart(inst_name:str,tunnel:dict):
+    inst_dir=frpc_root+"/"+inst_name
+    execF=f"{inst_dir}/frpc-{inst_name}"
+    iniF=f"{inst_dir}/frp-{inst_name}.ini"
+    newconf=ini_template.format(
+        tunnel["node"]+".mossfrp.cn",
+        tunnel["port"],
+        tunnel["code"],
+        inst_name,
+        tunnel["localIP"],
+        tunnel["localPort"],
+        tunnel["remotePort"]
+    )
+    with open(iniF,mode="w",encoding='UTF-8') as ini:
+        frp_log.debug("Opening and writing conf "+iniF)
+        ini.write(newconf)
+    FrpcSubProc(inst_name,execF,iniF).start()
