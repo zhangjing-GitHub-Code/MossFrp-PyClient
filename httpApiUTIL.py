@@ -1,4 +1,5 @@
-import requests,json
+import json
+import urllib.request as ureq
 from custlang import *
 APIROOTURI="public.ghs.wiki:7001"
 from logging import basicConfig,getLogger
@@ -51,11 +52,11 @@ def reqAPI(rtype : str,cargs : dict[str,str]):
         api_req_uri+="&"
     api_req_uri=api_req_uri[:-1]
     #api_log.info(api_req_uri)
-    req=requests.request("GET",api_req_uri,data=newargs,headers=newargs)
+    req=ureq.urlopen(api_req_uri)
     #print(req.raw)
-    if req.status_code!=200:
-        return (-1,"HTTP Protocol Error: "+str(req.status_code))
-    retdat=json.loads(req.text) # type: ignore
+    if req.getcode()!=200:
+        return (-1,"HTTP Protocol Error: "+str(req.getcode()))
+    retdat=json.loads(req.read()) # type: ignore
     #api_log.info(retdat)
     resstat=int(retdat["status"])
     if(resstat==200): return (1,retdat)
