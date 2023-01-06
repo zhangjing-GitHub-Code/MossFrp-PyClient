@@ -6,6 +6,7 @@ from logging import basicConfig,getLogger
 import logging
 basicConfig(format="[%(asctime)s] [%(name)s] [%(levelname)s] -> %(message)s",level=logging.INFO)
 api_log=getLogger(name="API")
+logined=False
 #del(dict)
 """
 Returns:
@@ -77,6 +78,8 @@ def m_login(loginType:str,acnt:str,passwd:str):
         global token
         token=r[1]["token"] #type:ignore # we love pylance
         api_log.debug(str(r[0])+str(r[1]))
+        global logined
+        logined=True
         return True
     else:
         api_log.warning(str(r[0])+": "+r[1])
@@ -84,6 +87,8 @@ def m_login(loginType:str,acnt:str,passwd:str):
 
 def m_logout(): # just simply reset token?
     global token
+    global logined
+    logined=False
     token=""
 
 def userCodeList():
